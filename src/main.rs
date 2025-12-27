@@ -104,8 +104,7 @@ enum Mode {
 #[derive(Parser)]
 #[command(name = "Langtu L98 Controller")]
 #[command(version = "1.0")]
-#[command(author = "roshansujith22@gmail.com")]
-#[command(about = "Allows for control of L98 keyboard\nDefault arguments:(0,0,2,0,4)")]
+#[command(about = "Allows for control of L98 keyboard\nDefault rainbow:(rainbow,0,2,0,4)")]
 struct CLIInterface {
     #[arg(value_enum)]
     mode: Mode,
