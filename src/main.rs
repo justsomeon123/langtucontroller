@@ -26,8 +26,8 @@ fn get_hidraws() -> io::Result<Vec<PathBuf>> {
 
 fn determine_connection(paths: &[PathBuf]) -> ConnectionType {
     match paths.len() {
-        2 => ConnectionType::Usb,
-        3 => ConnectionType::Wifi,
+        6 => ConnectionType::Usb,
+        7 => ConnectionType::Wifi,
         _ => ConnectionType::Unknown,
     }
 }
