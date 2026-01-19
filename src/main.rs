@@ -5,6 +5,12 @@ use std::io::{self, ErrorKind, Write};
 use std::os::unix::fs::FileTypeExt;
 use std::path::PathBuf;
 
+enum ConnectionType {
+    Usb,
+    Wifi,
+    Unknown,
+}
+
 fn get_hidraws() -> io::Result<Vec<PathBuf>> {
     let mut hidraws = Vec::new();
     for entry in fs::read_dir("/dev")? {
@@ -18,52 +24,75 @@ fn get_hidraws() -> io::Result<Vec<PathBuf>> {
     Ok(hidraws)
 }
 
+fn determine_connection(paths: &[PathBuf]) -> ConnectionType {
+    match paths.len() {
+        2 => ConnectionType::Usb,
+        3 => ConnectionType::Wifi,
+        _ => ConnectionType::Unknown,
+    }
+}
+
 fn get_keyboard_hid() -> io::Result<Option<PathBuf>> {
-    for hidraw in get_hidraws()? {
-        let syspath = PathBuf::from(format!(
-            "/sys/class/hidraw/{}/device",
-            hidraw
-                .file_name()
-                .ok_or(ErrorKind::NotFound)?
-                .to_string_lossy()
-        ));
+    let hidraws = get_hidraws()?;
 
-        // Use canonicalize to resolve symlinks in /sys/class
-        if let Ok(devpath) = fs::canonicalize(syspath) {
-            let subclass =
-                if let Some(path) = devpath.parent().map(|p| p.join("bInterfaceSubClass")) {
-                    fs::read(path).ok().and_then(|v| String::from_utf8(v).ok())
-                } else {
-                    None
-                };
+    match determine_connection(&hidraws) {
+        ConnectionType::Wifi => {
+            for hidraw in hidraws {
+                let syspath = PathBuf::from(format!(
+                    "/sys/class/hidraw/{}/device",
+                    hidraw
+                        .file_name()
+                        .ok_or(ErrorKind::NotFound)?
+                        .to_string_lossy()
+                ));
 
-            let product = if let Some(path) = devpath
-                .parent()
-                .and_then(|p| p.parent())
-                .map(|p| p.join("idProduct"))
-            {
-                fs::read(path).ok().and_then(|v| String::from_utf8(v).ok())
-            } else {
-                None
-            };
+                // Use canonicalize to resolve symlinks in /sys/class
+                if let Ok(devpath) = fs::canonicalize(syspath) {
+                    let subclass = if let Some(path) =
+                        devpath.parent().map(|p| p.join("bInterfaceSubClass"))
+                    {
+                        fs::read(path).ok().and_then(|v| String::from_utf8(v).ok())
+                    } else {
+                        None
+                    };
 
-            let vendor = if let Some(path) = devpath
-                .parent()
-                .and_then(|p| p.parent())
-                .map(|p| p.join("idVendor"))
-            {
-                fs::read(path).ok().and_then(|v| String::from_utf8(v).ok())
-            } else {
-                None
-            };
+                    let product = if let Some(path) = devpath
+                        .parent()
+                        .and_then(|p| p.parent())
+                        .map(|p| p.join("idProduct"))
+                    {
+                        fs::read(path).ok().and_then(|v| String::from_utf8(v).ok())
+                    } else {
+                        None
+                    };
 
-            if let (Some(subclass), Some(vendor), Some(product)) = (subclass, vendor, product) {
-                if subclass.trim() == "00" && product.trim() == "7fff" && vendor.trim() == "1a2c" {
-                    return Ok(Some(hidraw));
+                    let vendor = if let Some(path) = devpath
+                        .parent()
+                        .and_then(|p| p.parent())
+                        .map(|p| p.join("idVendor"))
+                    {
+                        fs::read(path).ok().and_then(|v| String::from_utf8(v).ok())
+                    } else {
+                        None
+                    };
+
+                    if let (Some(subclass), Some(vendor), Some(product)) =
+                        (subclass, vendor, product)
+                        && (subclass.trim() == "00" || subclass.trim() == "01")
+                        && (product.trim() == "7fff" || product.trim() == "484a")
+                        && vendor.trim() == "1a2c"
+                    {
+                        return Ok(Some(hidraw));
+                    }
                 }
             }
         }
-    }
+        ConnectionType::Usb => {
+            eprintln!("No USB support yet!")
+        }
+        ConnectionType::Unknown => eprintln!("Unknown connection type"),
+    };
+
     Ok(None)
 }
 
@@ -100,32 +129,41 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    ///Rainbow flowing effect
+    /// Rainbow flowing effect
     Rainbow {
-        ///Direction of animation (even right, odd left)
-        #[arg(long, default_value_t = 0)]
+        /// Direction of animation (even right, odd left)
+        #[arg(value_hint = clap::ValueHint::Other)]
         direction: u8,
-        ///Speed of rainbow cycling (0 is slowest)
-        #[arg(long, default_value_t = 2)]
+
+        /// Speed of rainbow cycling (0 is slowest)
+        #[arg(value_hint = clap::ValueHint::Other)]
         speed: u8,
-        //Brightness of keyboard (0-4)
-        #[arg(long, default_value_t = 4, value_parser = clap::value_parser!(u8).range(0..=4))]
+
+        /// Brightness of keyboard (0-4)
+        #[arg(value_hint = clap::ValueHint::Other, value_parser = clap::value_parser!(u8).range(0..=4))]
         brightness: u8,
     },
+
+    /// Static color mode
     Color {
-        ///Red channel intesnity (0-255)
-        #[arg(long, default_value_t = 255)]
+        /// Red channel intensity (0-255)
+        #[arg(value_hint = clap::ValueHint::Other)]
         red: u8,
-        ///Green channel color (0-255)
-        #[arg(long, default_value_t = 255)]
+
+        /// Green channel intensity (0-255)
+        #[arg(value_hint = clap::ValueHint::Other)]
         green: u8,
-        ///Blue channel color (0-255)
-        #[arg(long, default_value_t = 255)]
+
+        /// Blue channel intensity (0-255)
+        #[arg(value_hint = clap::ValueHint::Other)]
         blue: u8,
-        ///Brightness of keyboard (0-4)
-        #[arg(long, default_value_t = 4, value_parser = clap::value_parser!(u8).range(0..=4))]
+
+        /// Brightness of keyboard (0-4)
+        #[arg(value_hint = clap::ValueHint::Other, value_parser = clap::value_parser!(u8).range(0..=4))]
         brightness: u8,
     },
+
+    /// Generate shell completion scripts
     Completion {
         #[arg(value_enum)]
         shell: Shell,
