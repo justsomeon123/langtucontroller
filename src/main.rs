@@ -24,6 +24,9 @@ fn get_hidraws() -> io::Result<Vec<PathBuf>> {
     Ok(hidraws)
 }
 
+// FIX: This code can prevent connection even if there is a valid and accessible keyboard.
+// I.e., if there are other devices plugged in
+// Find another way to identify what kind of connection we are using.
 fn determine_connection(paths: &[PathBuf]) -> ConnectionType {
     match paths.len() {
         6 => ConnectionType::Usb,
@@ -136,7 +139,7 @@ enum Commands {
         direction: u8,
 
         /// Speed of rainbow cycling (0 is slowest)
-        #[arg(value_hint = clap::ValueHint::Other)]
+        #[arg(value_hint = clap::ValueHint::Other, value_parser = clap::value_parser!(u8).range(0..=4))]
         speed: u8,
 
         /// Brightness of keyboard (0-4)
@@ -147,15 +150,15 @@ enum Commands {
     /// Static color mode
     Color {
         /// Red channel intensity (0-255)
-        #[arg(value_hint = clap::ValueHint::Other)]
+        #[arg(value_hint = clap::ValueHint::Other, value_parser = clap::value_parser!(u8).range(0..=255))]
         red: u8,
 
         /// Green channel intensity (0-255)
-        #[arg(value_hint = clap::ValueHint::Other)]
+        #[arg(value_hint = clap::ValueHint::Other, value_parser = clap::value_parser!(u8).range(0..=255))]
         green: u8,
 
         /// Blue channel intensity (0-255)
-        #[arg(value_hint = clap::ValueHint::Other)]
+        #[arg(value_hint = clap::ValueHint::Other, value_parser = clap::value_parser!(u8).range(0..=255))]
         blue: u8,
 
         /// Brightness of keyboard (0-4)
@@ -214,7 +217,7 @@ fn main() {
     };
 
     match write_to_keyboard(hidpath, mode, val1, val2, val3, brightness) {
-        Ok(()) => println!("Successfully updated keyboard settings."),
+        Ok(()) => println!("Succesfully updated color"),
         Err(e) => eprintln!("Failed to write to keyboard: {:?}", e),
     };
 }
