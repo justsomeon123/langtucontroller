@@ -4,6 +4,7 @@
 
 ## Install/Build
 - Requires cargo on path, with a relevant toolchain installed.
+- Also requires fish solely because i was too lazy to write a .sh build file (will do that later)
 - This program needs root to write directly to hidraw, so you can either:
   - **Create a udev rule (recommended)**: [read here](#udev-configuration)
   - Always run it with sudo
@@ -27,10 +28,11 @@
 1. Create and edit rule file via `sudo nano /etc/udev/rules.d/99-langtu.rules`
 2. Paste in (makes it so only users of group "langtumod" can modify the hidraws):
 > \# Langtu L98 keyboard  
-> SUBSYSTEM=="hidraw", ATTRS{idVendor}=="1a2c", ATTRS{idProduct}=="7fff", MODE="0660", GROUP="langtumod"``
-3. Add profile to group:`sudo usermod -aG langtumod $USER`
-4. Restart system
-5. Check `groups` and ensure `langtumod` is listed
+> SUBSYSTEM=="hidraw", ATTRS{idVendor}=="1a2c", ATTRS{idProduct}=="7fff", MODE="0660", GROUP="langtumod"
+3. Create group: `sudo groupadd langtumod`
+4. Add profile to group:`sudo usermod -aG langtumod $USER`
+5. Restart system
+6. Check `groups` and ensure `langtumod` is listed
 
 ## Autocomplete
 1. Very basic autocomplete can be added by sourcing `langtuctl completion $SHELL`
